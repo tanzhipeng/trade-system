@@ -53,16 +53,17 @@ def get_begindate_from_enddate(end_date,date_index,day_num):
     return begin_date
 
 #get the date_interval by begin and end date
-def get_interval_by_begin_end_date(begin_date,end_date=None):
+def get_interval_by_begin_end_date(start_date,end_date=None):
 
-    if begin_date is not None:
+    if start_date is not None:
 
         if end_date is not None:
-            interval = pd.date_range(begin_date, end_date, freq='D')
+            interval = pd.date_range(start_date, end_date, freq='D')
         else:
             end_date = date.today().strftime()
-            interval = pd.date_range(begin_date, end_date, freq='D')
+            interval = pd.date_range(start_date, end_date, freq='D')
 
-        return interval
+        return interval,start_date,end_date
     else:
         return None
+

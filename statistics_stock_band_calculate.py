@@ -8,7 +8,7 @@ from datetime import date
 from pandas.tseries.offsets import Day, BusinessMonthBegin,BusinessMonthEnd,BQuarterBegin,BQuarterEnd,BYearBegin,BYearEnd,BusinessDay
 from common_tools import get_index_within_datetime_interval,get_datetime_by_index_within_interval,\
 get_day_num_by_date_range,get_begindate_from_enddate,get_interval_by_begin_end_date
-from db_tools import generate_db_link,close_db_link,execute_single_to_db,execute_many_to_db
+from db_tools import generate_db_link,close_db_link,execute_single_to_db,execute_many_to_db,select_from_db
 
 #instance definition:
 #(1)price_band:
@@ -17,6 +17,22 @@ from db_tools import generate_db_link,close_db_link,execute_single_to_db,execute
 #(2)band_group:
 #datatype:list of dict
 #columns: band_group_id,start_date,end_date,price_start,price_end,seq_num,price_ratio,group_type,group_duration,band_list
+
+def insert_bandgroup_of_stock_to_db(stock_code,start_date,end_date,group_type,threshold,\
+                                    cursor,hold_type=None,max_hold_duration=None,price_datas=None):
+
+    interval,start_date,end_date = get_interval_by_begin_end_date(start_date, end_date)
+    band_group_list, price_datas = get_price_band_and_groups_by_prices(stock_code, threshold, group_type, interval, hold_type, max_hold_duration,
+                                                                         price_datas, cursor)
+
+    group_num = len(band_group_list)
+
+    insert_bandgroup_info_to_db(stock_code, start_date, end_date, group_type, threshold, hold_type, max_hold_duration, group_num, cursor)
+    group_info_id = int(cursor.lastrowid)
+
+    insert_bandgroup_data_to_db(stock_code, group_info_id, band_group_list, cursor)
+
+    return band_group_list,price_datas
 
 def insert_bandgroup_info_to_db(stock_code,start_date,end_date,group_type,threshold,hold_type,max_hold_duration,group_num,cursor):
 
@@ -45,15 +61,19 @@ def insert_bandgroup_data_to_db(stock_code,group_info_oid,band_group_list,cursor
 #datatype:DataFrame
 #index:s_date1
 #columns:s_date,s_open,s_close,s_high,s_low,s_volume,s_amount
-def get_prices_by_stock_code(stock_code,interval=None):
+def get_prices_by_stock_code(stock_code,cursor,interval=None):
 
-    conn = pymysql.connect(host='192.168.0.105', unix_socket='3306', user='stock_user', passwd='Ws143029')
-    cursor = conn.cursor()
-    cursor.execute("use stock_database")
+    #conn = pymysql.connect(host='192.168.0.105', unix_socket='3306', user='stock_user', passwd='Ws143029')
+    #cursor = conn.cursor()
+    #cursor.execute("use stock_database")
+    #cursor.execute('SELECT s_date,s_close,s_open,s_high,s_low,s_volume,s_amount FROM stock_price_day WHERE s_code = %s', (stock_code,))
+    select_sql = 'SELECT s_date,s_close,s_open,s_high,s_low,s_volume,s_amount FROM stock_price_day WHERE s_code = %s'
+    args_in = (stock_code,)
+    result_list = select_from_db(select_sql,args_in,cursor)
 
-    cursor.execute('SELECT s_date,s_close,s_open,s_high,s_low,s_volume,s_amount FROM stock_price_day WHERE s_code = %s', (stock_code,))
 
-    price_data = DataFrame(list(cursor.fetchall()), columns=['s_date', 's_close', 's_open','s_high','s_low','s_volume','s_amount'])
+    #price_data = DataFrame(list(cursor.fetchall()), columns=['s_date', 's_close', 's_open','s_high','s_low','s_volume','s_amount'])
+    price_data = DataFrame(result_list,columns=['s_date', 's_close', 's_open', 's_high', 's_low', 's_volume', 's_amount'])
     price_data['s_date1'] = price_data['s_date']
     price_data = price_data.set_index('s_date1')
     price_data.index = pd.DatetimeIndex(price_data.index)
@@ -62,14 +82,12 @@ def get_prices_by_stock_code(stock_code,interval=None):
     if interval is not None:
         price_data = get_price_dataframe_by_interval(price_data, interval)
 
-    cursor.close()
-    conn.close()
 
     return price_data
 
 
 #return the bands and groups within the price interval
-def get_price_band_and_groups_by_prices(stock_code,threshold,threshold_type,interval=None,hold_type=None,max_hold_duration=None,price_datas=None):
+def get_price_band_and_groups_by_prices(stock_code,threshold,threshold_type,interval=None,hold_type=None,max_hold_duration=None,price_datas=None,cursor=None):
 
     #price_datas = None
     band_group_list = []
@@ -77,9 +95,9 @@ def get_price_band_and_groups_by_prices(stock_code,threshold,threshold_type,inte
     if price_datas is None:
 
         if interval is not None:
-            price_datas = get_prices_by_stock_code(stock_code,interval)
+            price_datas = get_prices_by_stock_code(stock_code,cursor,interval)
         else:
-            price_datas = get_prices_by_stock_code(stock_code)
+            price_datas = get_prices_by_stock_code(stock_code,cursor)
 
         price_datas.apply(calculate_price_band_and_group_by_date,args=(price_datas,threshold,threshold_type,band_group_list,hold_type,max_hold_duration),axis=1)
 
@@ -512,28 +530,31 @@ def get_price_dataframe_by_interval(price_data,interval):
 
 
 if __name__ == '__main__':
-    interval = get_interval_by_begin_end_date('2014-01-01', '2016-08-18')
-    statistic_bandgroup_data_list = []
+    #interval,startdate,enddate = get_interval_by_begin_end_date('2014-01-01', '2016-08-18')
+    #statistic_bandgroup_data_list = []
     #price_df = get_prices_by_stock_code(600019,interval)
     conn,cursor = generate_db_link('192.168.0.105','3306','stock_user','Ws143029',"stock_database")
 
-    h_band_group_list,price_datas = get_price_band_and_groups_by_prices('600372',0.10,'H',interval,'day',30)
-    l_band_group_list,price_datas = get_price_band_and_groups_by_prices('600372', 0.5, 'L', interval, 'day', 30, price_datas)
+    insert_bandgroup_of_stock_to_db('600372', '2014-01-01', '2016-08-18', 'H', 0.10, \
+                                    cursor, hold_type='day', max_hold_duration=30, price_datas=None)
 
-    group_num_h = len(h_band_group_list)
-    group_num_l = len(l_band_group_list)
+    #h_band_group_list,price_datas = get_price_band_and_groups_by_prices('600372',0.10,'H',interval,'day',30,None,cursor)
+    #l_band_group_list,price_datas = get_price_band_and_groups_by_prices('600372', 0.5, 'L', interval, 'day', 30, price_datas,cursor)
 
-    insert_bandgroup_info_to_db('600372','2014-01-01','2016-08-18','H',0.15,'day',30,group_num_h,cursor)
-    group_info_id_h = int(cursor.lastrowid)
+    #group_num_h = len(h_band_group_list)
+    #group_num_l = len(l_band_group_list)
 
-    insert_bandgroup_data_to_db('600372', group_info_id_h, h_band_group_list, cursor)
-    close_db_link(conn,cursor)
+    #insert_bandgroup_info_to_db('600372','2014-01-01','2016-08-18','H',0.15,'day',30,group_num_h,cursor)
+    #group_info_id_h = int(cursor.lastrowid)
 
-    insert_bandgroup_info_to_db('600372', '2014-01-01', '2016-08-18', 'L', 0.5, 'day', 30, group_num_l, cursor)
-    group_info_id_l = int(cursor.lastrowid)
+    #insert_bandgroup_data_to_db('600372', group_info_id_h, h_band_group_list, cursor)
+    #close_db_link(conn,cursor)
 
-    insert_bandgroup_data_to_db('600372', group_info_id_l, l_band_group_list, cursor)
-    close_db_link(conn, cursor)
+    #insert_bandgroup_info_to_db('600372', '2014-01-01', '2016-08-18', 'L', 0.5, 'day', 30, group_num_l, cursor)
+    #group_info_id_l = int(cursor.lastrowid)
+
+    #insert_bandgroup_data_to_db('600372', group_info_id_l, l_band_group_list, cursor)
+    #close_db_link(conn, cursor)
 
 
 
@@ -556,7 +577,7 @@ if __name__ == '__main__':
 
     print "------------------------------------------------------------------"
     """
-
+    """
     for group in h_band_group_list:
 
         start_position_20 = get_price_position_within_time_frequency(group['start_date'], price_datas, 'M', 3,'rank')
@@ -567,8 +588,10 @@ if __name__ == '__main__':
                 'band_num:', group['band_num'], 'group_duration_trade:', group[
                 'group_duration_trade'], 'group_duration_date:', group['group_duration_date'], \
                 'max_reverse_ratio:', group['max_reverse_ratio'], 'start_position_2M:', start_position_20
+    """
 
 
+    """
         price_band_list = group['band_list']
         for price_band in price_band_list:
             start_position_20 = get_price_position_within_tradedays(price_band['start_date'],price_datas,40,'min-max')
@@ -577,5 +600,5 @@ if __name__ == '__main__':
                 'start_date:',price_band['start_date'],'end_date:',price_band['end_date'],'price_ratio:',price_band['price_ratio'],'band_type:',price_band['band_type'],\
                 'duration_trade:',price_band['duration_trade'],'duration_date:',price_band['duration_date'],'max_reverse_ratio:',price_band['max_reverse_ratio'],\
                 'start_position_20:',start_position_20
-
+    """
 
