@@ -14,8 +14,9 @@ def execute_single_to_db(insert_sql,args_in,cursor):
 
 #execute insert,update,delete sql
 def execute_many_to_db(insert_sql,args_in,cursor):
-    cursor.executemany(insert_sql,args_in)
+    num_execute = cursor.executemany(insert_sql,args_in)
     cursor.connection.commit()
+    return num_execute
 
 #execute select sql and get the result as list
 def select_from_db(select_sql,args_in,cursor):

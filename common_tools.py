@@ -1,5 +1,5 @@
 import pandas as pd
-from datetime import date
+from datetime import date,datetime
 
 def get_interval_by_begin_end_date(begin_date,end_date=None):
 
@@ -67,3 +67,26 @@ def get_interval_by_begin_end_date(start_date,end_date=None):
     else:
         return None
 
+def getNowDateToStr():
+    now = datetime.now()
+    now_str = now.strftime("%Y-%m-%d")
+    return now_str
+
+
+def float_range(start,end,step):
+    output_list = []
+    if end > start:
+        now = start
+        output_list.append(start)
+        while (now+step)<=end:
+            now = now+step
+            output_list.append(now)
+
+
+    else:
+        output_list.append(start)
+
+    return output_list
+
+if __name__ == '__main__':
+    print float_range(0.05,0.5,0.001)

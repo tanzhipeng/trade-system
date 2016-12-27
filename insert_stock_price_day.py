@@ -1,6 +1,9 @@
 import pymysql
 import tushare as ts
 import datetime
+from pandas import DataFrame,Series
+from common_tools import getNowDateToStr
+from db_tools import generate_db_link,execute_many_to_db,select_from_db
 
 
 #write a function to insert or refresh the daily price of given stock
@@ -19,25 +22,13 @@ import datetime
 #2.fetch the  dataframe by execute function ts.get_h_data() given the latest date to the start augument and the current date to the end augument
 #3.if the length of result dataframe is 0,do nothing, else call insert_price_by_stockcode method between the startdate and enddate
 
-def update_price_by_stocks_combination(stocks_code,autype='qfq'):
+
+def update_price_by_stocks_combination(stocks_code_series,fqtype='qfq',cursor=None):
     stock_base_list = ts.get_stock_basics()
-    conn = pymysql.connect(host='192.168.0.103', unix_socket='3306', user='stock_user', passwd='Ws143029')
-    cursor = conn.cursor()
-    cursor.execute("use stock_database")
+    stocks_code_series.apply(update_price_by_stockcode, args=(stock_base_list,fqtype,cursor))
 
-    ##try:
 
-    for code in stocks_code:
-        update_price_by_stockcode(code,cursor,stock_base_list,autype)
-        cursor.connection.commit()
-    ##except Exception,e:
-        ##print('There is something wrong when update price data :%s',str(e))
-    ##finally:
-    cursor.close()
-    conn.close()
-
-def update_price_by_stockcode(stock_code,cursor,stock_base_list,autype='qfq'):
-
+def update_price_by_stockcode(stock_code,stock_base_list,fqtype='qfq',cursor=None):
 
     cursor.execute('SELECT MAX(s_date) FROM stock_price_day WHERE s_code = %s',(stock_code,))
 
@@ -46,64 +37,58 @@ def update_price_by_stockcode(stock_code,cursor,stock_base_list,autype='qfq'):
     if latest_date is not None:
 
         latest_date_str = latest_date.strftime('%Y-%m-%d')
-        now_date_str = getNowDate()
+        now_date_str = getNowDateToStr()
 
         if latest_date_str != now_date_str:
             start_date_str = latest_date.replace(day=latest_date.day+1).strftime('%Y-%m-%d')
-            df = ts.get_h_data(stock_code,start=start_date_str,end=now_date_str)
-            if df is not None:
-                insert_price_by_stockcode(stock_code,cursor,stock_base_list,start_date=start_date_str,end_date=now_date_str,autype=autype)
+            #df = ts.get_h_data(stock_code,start=start_date_str,end=now_date_str)
+            #if df is not None:
+            #(stock_code,start_date=None,end_date=None,fq_type='qfq',stock_base_list=None,cursor=None)
+            insert_stock_data_by_code(stock_code,start_date_str,now_date_str,fqtype,stock_base_list,cursor)
     else:
-        insert_price_by_stockcode(stock_code,cursor,stock_base_list,autype=autype)
+        insert_stock_data_by_code(stock_code=stock_code,fqtype=fqtype,stock_base_list=stock_base_list,cursor=cursor)
 
 
 #insert the price data of the combination of stocks to the database
 #The input argument is sequence which contain the code of stocks
-def insert_price_by_stocks_combination(stocks_code,autype='qfq'):
+def insert_price_by_stocks_combination(stocks_code_series,start_date=None,end_date=None,fqtype='qfq',cursor=None):
 
     stock_base_list = ts.get_stock_basics()
-
-    conn = pymysql.connect(host='192.168.0.103', unix_socket='3306', user='stock_user', passwd='Ws143029')
-    cursor = conn.cursor()
-    cursor.execute("use stock_database")
+    stocks_code_series.apply(insert_stock_data_by_code,args=(start_date,end_date,fqtype,stock_base_list,cursor))
 
 
-    for code in stocks_code:
-        insert_price_by_stockcode(code,cursor,stock_base_list,autype=autype)
-        cursor.connection.commit()
+def insert_stock_data_by_code(stock_code,start_date=None,end_date=None,fq_type='qfq',stock_base_list=None,cursor=None):
 
-    cursor.close()
-    conn.close()
+    if stock_base_list is None:
+        stock_base_list = ts.get_stock_basics()
 
-#insert daily price of a stock into database
-def insert_price_one_day(price,code,cursor):
-    cursor.execute(
-        "insert into stock_price_day(s_code,s_date,s_open,s_high,s_low,s_close,s_volume,s_amount) values (%s,%s,%s,%s,%s,%s,%s,%s)",
-        (code, price.trade_date, price.open, price.high, price.low,price.close, price.volume ,price.amount))
+    if start_date == None:
+        start_date = datetime.datetime.strptime(str(stock_base_list.ix[stock_code]['timeToMarket']), '%Y%m%d').strftime(
+            '%Y-%m-%d')
 
-#insert price of a stock whith a period into database
-def insert_price_by_stockcode(stock_code,cursor,stock_base_list,start_date=None,end_date=None,fq_type=None,autype='qfq'):
-    #stock_base_list = None
-    if start_date==None:
-        #stock_base_list = ts.get_stock_basics()
-        #print(type(stock_base_list.ix[stock_code]['timeToMarket']))
-        #start_date = str(datetime.datetime.strptime(str(stock_base_list.ix[stock_code]['timeToMarket']), '%Y%m%d'))
-        start_date = datetime.datetime.strptime(str(stock_base_list.ix[stock_code]['timeToMarket']), '%Y%m%d').strftime('%Y-%m-%d')
-    if end_date==None:
-        end_date = getNowDate()
+    if end_date == None:
+        end_date = getNowDateToStr()
 
-    price_df = ts.get_h_data(stock_code,start=start_date,end=end_date,autype=autype)
-    price_df['trade_date'] = price_df.index.strftime('%Y%m%d')
-    price_df.apply(insert_price_one_day,args=(stock_code,cursor),axis=1)
+    price_df = ts.get_k_data(stock_code, ktype='D',autype=fq_type, start=start_date, end=end_date)
+    param_list = zip(price_df['code'],price_df['date'],price_df['open'],price_df['close'],\
+                   price_df['high'],price_df['low'],price_df['volume'])
+
+    param_in = [(param[0],param[1],float(param[2]),float(param[3]),float(param[4]), \
+                 float(param[5]),int(param[6])) for param in param_list]
 
 
-#return the today with the format 'yyyy-mm-dd'
-def getNowDate():
-    now = datetime.datetime.now()
-    now_str = now.strftime("%Y-%m-%d")
-    return now_str
+    sql_insert = "insert into stock_price_day(s_code,s_date,s_open,s_close,s_high,s_low,s_volume)" \
+                " values (%s,%s,%s,%s,%s,%s,%s)"
+
+    num_insert = execute_many_to_db(sql_insert,param_in,cursor)
+    if num_insert is None:
+        num_insert = 0
+
+    print "%d rows of code %s are insert into database!" %(num_insert,stock_code)
 
 
 if __name__=='__main__':
 #update_price_by_stockcode('600783')
-    insert_price_by_stocks_combination(['600018'],autype='None')
+    conn,cursor = generate_db_link('192.168.0.105', '3306', 'stock_user', 'Ws143029', 'stock_database')
+    update_price_by_stocks_combination(Series(['603000','601898']),fqtype='qfq',cursor=cursor)
+    #insert_stock_data_by_code('600372', start_date='2016-07-14', end_date='2016-12-23', cursor=cursor)

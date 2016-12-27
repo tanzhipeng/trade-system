@@ -6,7 +6,6 @@ from statistics_stock_band_calculate import get_interval_by_begin_end_date,get_p
 from pandas import Series,DataFrame
 
 
-
 #stock_code:股票编码  threshold_h:上涨波段阀值    threshold_l：下跌波段阀值
 #begin：股价起始区间   end_date:股价结束区间  hold_type：最长持股周期单位（day:按自然日  其他:按交易日）  max_hold_duration:最大持股周期
 def statistic_on_bandgroup(stock_code,threshold,threshold_type,begin_date,end_date=None,hold_type=None,max_hold_duration=None,price_datas=None):
@@ -40,12 +39,12 @@ def statistic_on_bandgroup(stock_code,threshold,threshold_type,begin_date,end_da
     return statistic_data,band_group_list,price_datas
 
 def get_statics_data_by_bandgrouplist(band_group,band_group_list,price_datas,bandgroup_statistic_data_dict):
-#band_group_id = band_group['band_group_id']
-    duration_between_previous_trade = 0
-    duration_between_previous_date = 0
+    #band_group_id = band_group['band_group_id']
+    duration_betwn_prev_trade = 0
+    duration_betwn_prev_date = 0
 
-#start_date = band_group['start_date']
-#end_date = band_group['end_date']
+    #start_date = band_group['start_date']
+    #end_date = band_group['end_date']
     band_num = band_group['band_num']
     group_duration_trade = band_group['group_duration_trade']
     group_duration_date = band_group['group_duration_date']
@@ -92,22 +91,10 @@ def get_statics_data_by_bandgrouplist(band_group,band_group_list,price_datas,ban
 
 def do_statistic_on_bandgroup(bandgroup_dataframe):
 
-    #band_group_num = len(bandgroup_dataframe)
-
     #print bandgroup_dataframe
     #print bandgroup_dataframe.values
 
     statistic_data = bandgroup_dataframe.apply(do_statistic_on_series,axis=0)
-
-    """
-    series_band_num = bandgroup_dataframe['band_num']
-    series_price_ratio = bandgroup_dataframe['price_ratio']
-    series_group_duration_trade = bandgroup_dataframe['group_duration_trade']
-    series_group_duration_date = bandgroup_dataframe['group_duration_date']
-    series_duration_betweenn_prev_trade = bandgroup_dataframe['duration_between_previous_trade']
-    series_duration_betweenn_prev_date = bandgroup_dataframe['duration_between_previous_date']
-    series_max_reverse_ratio = bandgroup_dataframe['max_reverse_ratio']
-    """
     return statistic_data
 
 
