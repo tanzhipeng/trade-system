@@ -1,0 +1,21 @@
+CREATE TABLE stock_band_group_statistic(
+s_code VARCHAR(30) NOT NULL,
+group_info_oid INT NOT NULL,
+bandgroup_column VARCHAR(500) NOT NULL,
+mean_value FLOAT(6,2),
+std_value FLOAT(6,2),
+median_value FLOAT(6,2),
+min_value FLOAT(6,2),
+qtl_5_percnt  FLOAT(6,2),
+qtl_10_percnt  FLOAT(6,2),
+qtl_15_percnt  FLOAT(6,2),
+qtl_20_percnt  FLOAT(6,2),
+qtl_25_percnt  FLOAT(6,2),
+qtl_30_percnt  FLOAT(6,2),
+qtl_70_percnt  FLOAT(6,2),
+qtl_75_percnt  FLOAT(6,2),
+qtl_80_percnt  FLOAT(6,2),
+qtl_85_percnt  FLOAT(6,2),
+qtl_90_percnt  FLOAT(6,2),
+MAX_VALUE  FLOAT(6,2)
+);
