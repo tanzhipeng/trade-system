@@ -19,11 +19,14 @@ from db_tools import generate_db_link,close_db_link,execute_single_to_db,execute
 #columns: band_group_id,start_date,end_date,price_start,price_end,seq_num,price_ratio,group_type,group_duration,band_list
 
 def insert_bandgroup_of_stock_to_db(stock_code,start_date,end_date,group_type,threshold,\
-                                    cursor,hold_type=None,max_hold_duration=None,price_datas=None):
+                                    hold_type=None,max_hold_duration=None,cursor=None,price_datas=None,\
+                                    band_group_list=None):
 
-    interval,start_date,end_date = get_interval_by_begin_end_date(start_date, end_date)
-    band_group_list, price_datas = get_price_band_and_groups_by_prices(stock_code, threshold, group_type, interval, hold_type, max_hold_duration,
-                                                                         price_datas, cursor)
+    if band_group_list is None:
+        interval, start_date, end_date = get_interval_by_begin_end_date(start_date, end_date)
+        band_group_list, price_datas = get_price_band_and_groups_by_prices(stock_code, threshold, group_type, interval,\
+                                            hold_type, max_hold_duration,price_datas, cursor)
+
 
     group_num = len(band_group_list)
 
@@ -32,7 +35,7 @@ def insert_bandgroup_of_stock_to_db(stock_code,start_date,end_date,group_type,th
 
     insert_bandgroup_data_to_db(stock_code, group_info_id, band_group_list, cursor)
 
-    return band_group_list,price_datas
+    return band_group_list,price_datas,group_info_id
 
 def insert_bandgroup_info_to_db(stock_code,start_date,end_date,group_type,threshold,hold_type,max_hold_duration,group_num,cursor):
 
@@ -530,39 +533,13 @@ def get_price_dataframe_by_interval(price_data,interval):
 
 
 if __name__ == '__main__':
-    #interval,startdate,enddate = get_interval_by_begin_end_date('2014-01-01', '2016-08-18')
-    #statistic_bandgroup_data_list = []
-    #price_df = get_prices_by_stock_code(600019,interval)
+
     conn,cursor = generate_db_link('192.168.0.105','3306','stock_user','Ws143029',"stock_database")
 
     insert_bandgroup_of_stock_to_db('600372', '2014-01-01', '2016-08-18', 'H', 0.10, \
-                                    cursor, hold_type='day', max_hold_duration=30, price_datas=None)
-
-    #h_band_group_list,price_datas = get_price_band_and_groups_by_prices('600372',0.10,'H',interval,'day',30,None,cursor)
-    #l_band_group_list,price_datas = get_price_band_and_groups_by_prices('600372', 0.5, 'L', interval, 'day', 30, price_datas,cursor)
-
-    #group_num_h = len(h_band_group_list)
-    #group_num_l = len(l_band_group_list)
-
-    #insert_bandgroup_info_to_db('600372','2014-01-01','2016-08-18','H',0.15,'day',30,group_num_h,cursor)
-    #group_info_id_h = int(cursor.lastrowid)
-
-    #insert_bandgroup_data_to_db('600372', group_info_id_h, h_band_group_list, cursor)
-    #close_db_link(conn,cursor)
-
-    #insert_bandgroup_info_to_db('600372', '2014-01-01', '2016-08-18', 'L', 0.5, 'day', 30, group_num_l, cursor)
-    #group_info_id_l = int(cursor.lastrowid)
-
-    #insert_bandgroup_data_to_db('600372', group_info_id_l, l_band_group_list, cursor)
-    #close_db_link(conn, cursor)
+                                    'day', 30, cursor)
 
 
-
-
-    #l_band_group_list, price_datas = get_price_band_and_groups_by_prices('600019', 0.10, 'L', interval, 'day', 30,price_datas)
-
-    #print "h_group",len(h_band_group_list)
-    #print "l_group",len(l_band_group_list)
 
     """
     for group in l_band_group_list:
