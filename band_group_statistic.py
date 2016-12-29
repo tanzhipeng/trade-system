@@ -5,7 +5,7 @@ from common_tools import get_day_num_by_date_range,get_interval_by_begin_end_dat
 from statistics_stock_band_calculate import get_interval_by_begin_end_date,get_price_band_and_groups_by_prices,\
     insert_bandgroup_of_stock_to_db
 from pandas import Series,DataFrame
-from db_tools import generate_db_link
+from db_tools import generate_db_link,execute_many_to_db,close_db_link
 
 
 
@@ -19,14 +19,23 @@ def insert_alldata_of_bandgroup_to_db(stock_code,threshold,group_type,start_date
     band_group_list1,price_datas1,group_info_id = insert_bandgroup_of_stock_to_db(stock_code, start_date, end_date,\
         group_type, threshold, hold_type, max_hold_duration, cursor, price_datas, band_group_list)
 
+    insert_bandgroup_statistic_to_db(stock_code,group_info_id,statistic_data,cursor)
 
+    return statistic_data,band_group_list,price_datas,group_info_id
 
+def insert_bandgroup_statistic_to_db(stock_code,group_info_id,statistic_data,cursor):
 
+    sql_insert = " insert into  stock_band_group_statistic values(%s,%s,%s,%s,%s,%s,%s,%s,%s,\
+            %s,%s,%s,%s,%s,%s,%s,%s,%s,%s)"
 
-def insert_bandgroup_statistic_to_db(stock_code,group_info_id,statistic_data):
+    args_tmp = [ [stock_code,group_info_id]+[col_name]+list(col)  for col_name,col in list(statistic_data.iteritems())]
+    args_in = [ (arg_list[0],arg_list[1],arg_list[2],float(arg_list[3]),float(arg_list[4]), \
+                 float(arg_list[5]),float(arg_list[6]),float(arg_list[7]),float(arg_list[8]), \
+                 float(arg_list[9]),float(arg_list[10]),float(arg_list[11]),float(arg_list[12]), \
+                 float(arg_list[13]),float(arg_list[14]),float(arg_list[15]),float(arg_list[16]), \
+                 float(arg_list[17]),float(arg_list[17])) for arg_list in args_tmp]
 
-
-
+    execute_many_to_db(sql_insert, args_in, cursor)
 
 #stock_code:股票编码  threshold_h:上涨波段阀值    threshold_l：下跌波段阀值
 #begin：股价起始区间   end_date:股价结束区间  hold_type：最长持股周期单位（day:按自然日  其他:按交易日）  max_hold_duration:最大持股周期
@@ -135,9 +144,14 @@ if __name__ == '__main__':
     #interval = get_interval_by_begin_end_date('2014-01-01', '2016-08-18')
     #h_band_group_list, price_datas = get_price_band_and_groups_by_prices('000503', 0.10, 'H',interval, 'day', 30)
     conn, cursor = generate_db_link('192.168.0.105', '3306', 'stock_user', 'Ws143029', "stock_database")
-    statistic_data,band_group_list,price_datas = get_all_data_on_bandgroup('600019',0.10,'H','2016-01-01','2016-07-01','trade',20,cursor)
+    #statistic_data,band_group_list,price_datas = get_all_data_on_bandgroup('600019',0.10,'H','2016-01-01','2016-07-01','trade',20,cursor)
 
-    print statistic_data
+    insert_alldata_of_bandgroup_to_db('600019', 0.10, 'H', '2016-01-01', '2016-07-01', 'trade', \
+            20,cursor)
+
+    close_db_link(conn, cursor)
+
+    #print statistic_data
     #print type(statistic_data)
     #print statistic_data.columns
     #print statistic_data.values

@@ -1,4 +1,5 @@
 from numpy import arange
+from pandas import DataFrame,Series
 from statistics_stock_band_calculate import get_prices_by_stock_code
 from itertools import product
 from common_tools import get_interval_by_begin_end_date
@@ -10,11 +11,11 @@ def arguments_init(threshold_start,threshold_end,threshold_step,max_hold_duratio
     max_hold_duration_args = range(max_hold_duration_start,max_hold_duration_end,max_hold_duration_step)
 
     args_combine = product(threshold_args,max_hold_duration_args,hold_type_list)
-    args_output = [args for args in args_combine]
+    args_output = Series([args for args in args_combine])
 
     return args_output
 
-def arguments_init_adjust(stock_code,start_date,end_date,threshold_type,threshold_start,threshold_end,threshold_step,\
+def do_statistic_by_arguments_adjust(stock_code,start_date,end_date,threshold_type,threshold_start,threshold_end,threshold_step,\
                           hold_type_list,max_hold_duration_start,max_hold_duration_end,max_hold_duration_step,cursor
                           ):
     args_combine = arguments_init(threshold_start,threshold_end,threshold_step,max_hold_duration_start,\
