@@ -53,7 +53,7 @@ def get_all_data_on_bandgroup(stock_code,threshold,group_type,start_date,end_dat
                                   }
 
     band_group_list, price_datas = get_price_band_and_groups_by_prices(stock_code, threshold, group_type,interval,\
-                                       'day', 30, cursor=cursor)
+                                       hold_type, max_hold_duration, cursor=cursor)
 
     if threshold is not None:
         for band_group in band_group_list:

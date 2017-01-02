@@ -41,9 +41,11 @@ def get_begindate_from_enddate(end_date,date_index,day_num):
     datetime_interval = date_index
 
     end_index = get_index_within_datetime_interval(end_date,datetime_interval)
+    print "end_index:",end_index
+
     begin_index = 0
-    if end_index >= day_num:
-        begin_index = end_index - day_num
+    if (end_index+1) > day_num:
+        begin_index = end_index - (day_num-1)
     else:
         begin_index = 0
 

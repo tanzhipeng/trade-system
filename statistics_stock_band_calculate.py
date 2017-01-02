@@ -13,7 +13,7 @@ from db_tools import generate_db_link,close_db_link,execute_single_to_db,execute
 #instance definition:
 #(1)price_band:
 #datatype:dict
-#columns: band_id,start_date,end_date,seq_num,price_start,price_end,price_raio,band_type(H,L),trade_date_list,duration,band_group_id
+#columns: band_id,start_date,end_date,seq_num,price_start,price_end,price_raio,band_type(H,L),trade_date_series,duration,band_group_id
 #(2)band_group:
 #datatype:list of dict
 #columns: band_group_id,start_date,end_date,price_start,price_end,seq_num,price_ratio,group_type,group_duration,band_list
@@ -22,24 +22,25 @@ def insert_bandgroup_of_stock_to_db(stock_code,start_date,end_date,group_type,th
                                     hold_type=None,max_hold_duration=None,cursor=None,price_datas=None,\
                                     band_group_list=None):
 
+    interval, start_date, end_date = get_interval_by_begin_end_date(start_date, end_date)
     if band_group_list is None:
-        interval, start_date, end_date = get_interval_by_begin_end_date(start_date, end_date)
         band_group_list, price_datas = get_price_band_and_groups_by_prices(stock_code, threshold, group_type, interval,\
                                             hold_type, max_hold_duration,price_datas, cursor)
 
-
     group_num = len(band_group_list)
 
-    insert_bandgroup_info_to_db(stock_code, start_date, end_date, group_type, threshold, hold_type, max_hold_duration, group_num, cursor)
-    group_info_id = int(cursor.lastrowid)
+    if group_num > 0:
+        insert_bandgroup_info_to_db(stock_code, start_date, end_date, group_type, threshold, hold_type, max_hold_duration, group_num, cursor)
+        group_info_id = int(cursor.lastrowid)
 
-    insert_bandgroup_data_to_db(stock_code, group_info_id, band_group_list, cursor)
-
-    return band_group_list,price_datas,group_info_id
+        insert_bandgroup_data_to_db(stock_code, group_info_id, band_group_list, cursor)
+        return band_group_list,price_datas,group_info_id
+    else:
+        return None
 
 def insert_bandgroup_info_to_db(stock_code,start_date,end_date,group_type,threshold,hold_type,max_hold_duration,group_num,cursor):
 
-    param_in = [stock_code,start_date,end_date,group_type,threshold,hold_type,max_hold_duration,group_num]
+    param_in = [stock_code,start_date,end_date,group_type,float(threshold),hold_type,int(max_hold_duration),group_num]
 
     sql_insert = "insert into stock_band_group_info(s_code,start_date,end_date,group_type,threshold,\
                 hold_type,max_hold_duration,group_num,create_date,refresh_date) values (\
@@ -90,7 +91,8 @@ def get_prices_by_stock_code(stock_code,cursor,interval=None):
 
 
 #return the bands and groups within the price interval
-def get_price_band_and_groups_by_prices(stock_code,threshold,threshold_type,interval=None,hold_type=None,max_hold_duration=None,price_datas=None,cursor=None):
+def get_price_band_and_groups_by_prices(stock_code,threshold,threshold_type,interval=None,hold_type=None,\
+                                        max_hold_duration=None,price_datas=None,cursor=None):
 
     #price_datas = None
     band_group_list = []
@@ -277,11 +279,13 @@ def create_single_band_of_current_point(band_point,current_point,pct_change_data
 
     #print duration_trade,duration_date
     #print start_date,end_date
-    trade_date_list = list(pct_change_data['s_date'][start_date:end_date])
+    #trade_date_series = list(pct_change_data['s_date'][start_date:end_date])
+    trade_date_series = pct_change_data['s_date'][start_date:end_date]
 
-    price_band = {'band_id':band_id,'start_date':start_date,'end_date':end_date,'seq_num':seq_num,'price_start':price_start,
-                'price_end':price_end,'price_ratio':price_ratio,'band_type':band_type,'duration_trade':duration_trade,
-                  'duration_date':duration_date,'band_group_id':band_group_id,'trade_date_list':trade_date_list,'max_reverse_ratio':max_reverse_ratio}
+    price_band = {'band_id':band_id,'start_date':start_date,'end_date':end_date,'seq_num':seq_num,\
+                  'price_start':price_start,'price_end':price_end,'price_ratio':price_ratio,\
+                  'band_type':band_type,'duration_trade':duration_trade,'duration_date':duration_date,\
+                  'band_group_id':band_group_id,'trade_date_series':trade_date_series,'max_reverse_ratio':max_reverse_ratio}
 
     return price_band
 
@@ -325,45 +329,100 @@ def cal_band_pct_data_by_point(price_datas,band_group,current_date,current_price
     band_cal_data = None
     pct_change_sequence = None
     start_date = None
+    if max_hold_duration is None:
+        max_hold_duration = 0
+
     if (band_group is not None) and (len(band_group) > 0):
-        band_trade_date_list = get_feature_of_band_within_bandgroup(band_group, -1, 'trade_date_list')
-        last_band_second_date = band_trade_date_list[1]
+        band_trade_date_list = get_feature_of_band_within_bandgroup(band_group, -1, 'trade_date_series')
+        #The orginal startdate is the second date of last band
+        origin_start_date = band_trade_date_list[1]
 
         if hold_type is None:
-            start_date = last_band_second_date
+            start_date = origin_start_date
         else:
 
-            if max_hold_duration is None:
-                max_hold_duration = 0
-
             if hold_type == 'day':
-                day_duration_num = get_day_num_by_date_range(current_date - last_band_second_date)
+                """
+                day_duration_num = get_day_num_by_date_range(current_date - origin_start_date)
                 if day_duration_num > max_hold_duration:
                     start_date = current_date - Day(max_hold_duration)
                 else:
-                    start_date = last_band_second_date
+                    start_date = origin_start_date
+              """
+                start_date = get_startdate_by_day_with_max(origin_start_date, current_date, max_hold_duration)
             else:
-                trade_day_num = len(band_trade_date_list[last_band_second_date:current_date])
+                trade_date_series = price_datas['s_date']
+                start_date = get_startdate_by_trade_with_max(price_datas, origin_start_date, current_date,
+                                                             max_hold_duration)
+                """
+                trade_day_num = len(trade_date_series[origin_start_date:current_date])
                 if trade_day_num > max_hold_duration:
                     date_index = price_datas.index
                     start_date = get_begindate_from_enddate(current_date,date_index,max_hold_duration)
                 else:
-                    start_date = last_band_second_date
-
+                    start_date = origin_start_date
+              """
+        """
         band_cal_data = price_datas.ix[start_date:current_date]
         pct_change_sequence = cal_pct_change_between_point_interval(band_cal_data['s_close'], current_price)
         band_cal_data['pct_change'] = pct_change_sequence
-
+       """
     else:
-        start_date = price_datas.ix[0]['s_date']
-        band_cal_data = price_datas.ix[start_date:current_date]
-        if len(band_cal_data) > 1:
-            pct_change_sequence = cal_pct_change_between_point_interval(band_cal_data['s_close'], current_price)
-            band_cal_data['pct_change'] = pct_change_sequence
+        origin_start_date = price_datas.ix[0]['s_date']
+
+        if hold_type is None:
+            start_date = origin_start_date
         else:
-            band_cal_data = None
+            if hold_type == 'day':
+                start_date = get_startdate_by_day_with_max(origin_start_date, current_date, max_hold_duration)
+            else:
+                trade_date_series = price_datas['s_date']
+                start_date = get_startdate_by_trade_with_max(price_datas,origin_start_date,current_date,max_hold_duration)
+        """
+        if hold_type == 'day':
+            day_duration_num = get_day_num_by_date_range(current_date - price_start_date)
+            if day_duration_num > max_hold_duration:
+                start_date = current_date - Day(max_hold_duration)
+            else:
+                start_date = price_start_date
+        """
+
+    band_cal_data = price_datas.ix[start_date:current_date]
+    if len(band_cal_data) > 1:
+        pct_change_sequence = cal_pct_change_between_point_interval(band_cal_data['s_close'], current_price)
+        band_cal_data['pct_change'] = pct_change_sequence
+    else:
+        band_cal_data = None
+
+    #print 'hold_type:',hold_type,'max_hold_duration:',max_hold_duration,'current_date:',current_date,\
+        #'origin_start_date:',origin_start_date,'start_date:',start_date
 
     return band_cal_data
+
+def get_startdate_by_day_with_max(original_start_date,end_date,max_hold_duration):
+
+    day_duration_num = get_day_num_by_date_range(end_date - original_start_date)
+    #print day_duration_num
+    if day_duration_num > max_hold_duration:
+        start_date = end_date - Day(max_hold_duration)
+    else:
+        start_date = original_start_date
+
+    return start_date
+
+def get_startdate_by_trade_with_max(trade_date_ser,original_start_date,end_date,max_hold_duration):
+
+    trade_date_ser_orgin = trade_date_ser[original_start_date:end_date]
+    trade_day_num = len(trade_date_ser_orgin)
+    #print 'trade_day_num:',trade_day_num
+    if trade_day_num > max_hold_duration:
+        date_index = trade_date_ser_orgin.index
+        start_date = get_begindate_from_enddate(end_date, date_index, max_hold_duration)
+    else:
+        start_date = original_start_date
+
+    return start_date
+
 
 def get_band_id_of_band(last_band_group):
 
@@ -395,7 +454,7 @@ def  is_new_band_group(new_band_point,band_group):
         #last_band = band_group[-1]
         if (band_group is not None) and (len(band_group) > 0):
             #first_band = band_group[0]
-            #last_date_of_first_band_in_group = get_feature_of_band_within_bandgroup(band_group, 0, 'trade_date_list')[-1]
+            #last_date_of_first_band_in_group = get_feature_of_band_within_bandgroup(band_group, 0, 'trade_date_series')[-1]
             last_date_of_band_group = band_group['end_date']
             if (new_band_point['s_date']>last_date_of_band_group):
                 last_band_group_id = band_group['band_group_id']
@@ -539,7 +598,7 @@ if __name__ == '__main__':
     insert_bandgroup_of_stock_to_db('600372', '2014-01-01', '2016-08-18', 'H', 0.10, \
                                     'day', 30, cursor)
 
-
+    close_db_link(conn, cursor)
 
     """
     for group in l_band_group_list:
