@@ -15,8 +15,11 @@ def get_interval_by_begin_end_date(begin_date,end_date=None):
     else:
         return None
 
-def get_day_num_by_date_range(date_range):
-    return float(date_range.total_seconds()/(24*60*60))
+def get_day_num_by_date_range(date_timedelta):
+    #print type(date_range)
+    #return float(date_range.total_seconds()/(24*60*60))
+    #print date_timedelta.days
+    return date_timedelta.days
 
 
 def get_index_within_datetime_interval(dtime,datetime_interval):

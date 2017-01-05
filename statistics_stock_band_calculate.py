@@ -225,7 +225,7 @@ def create_or_refresh_band_group(price_band_of_point,pct_change_data,band_group_
         group_start_date = refresh_band_group['start_date']
         group_end_date = refresh_band_group['end_date']
         old_start_price = refresh_band_group['price_start']
-        old_group_duration_trade = refresh_band_group['group_duration_trade']
+        #old_group_duration_trade = refresh_band_group['group_duration_trade']
         new_end_price = price_band_of_point['price_end']
         group_type = refresh_band_group['group_type']
 
@@ -234,7 +234,8 @@ def create_or_refresh_band_group(price_band_of_point,pct_change_data,band_group_
         new_price_end = price_band_of_point['price_end']
         new_price_ratio = cal_pct_change_between_point(old_start_price,new_end_price)
         #new_group_duration_trade = old_group_duration_trade+price_band_of_point['duration_trade']
-        new_group_duration_trade = old_group_duration_trade+len(pct_change_data_tmp.ix[group_end_date:new_end_date])
+        #new_group_duration_trade = old_group_duration_trade+len(pct_change_data_tmp.ix[group_end_date:new_end_date])
+        new_group_duration_trade = len(pct_change_data_tmp.ix[group_start_date:new_end_date])-1
 
         #date_interval = get_interval_by_begin_end_date(group_start_date,new_end_date)
         new_group_duration_date = get_day_num_by_date_range(new_end_date-group_start_date)
@@ -268,7 +269,7 @@ def create_single_band_of_current_point(band_point,current_point,pct_change_data
     price_end = current_point[1]
     seq_num = band_id
     price_ratio = cal_pct_change_between_point(price_start,price_end)
-    duration_trade = len(pct_change_data.ix[start_date:end_date])
+    duration_trade = len(pct_change_data.ix[start_date:end_date])-1
 
     price_array = pct_change_data.ix[start_date:end_date]
     max_reverse_ratio = cal_max_reverse_ratio_by_price_datas(price_array,band_type)
@@ -593,7 +594,7 @@ def get_price_dataframe_by_interval(price_data,interval):
 
 if __name__ == '__main__':
 
-    conn,cursor = generate_db_link('192.168.0.105','3306','stock_user','Ws143029',"stock_database")
+    conn,cursor = generate_db_link('192.168.0.103','3306','stock_user','Ws143029',"stock_database")
 
     insert_bandgroup_of_stock_to_db('600372', '2014-01-01', '2016-08-18', 'H', 0.10, \
                                     'day', 30, cursor)

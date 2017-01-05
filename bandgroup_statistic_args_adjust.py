@@ -35,9 +35,9 @@ def do_statistic_by_arguments_adjust(stock_code,start_date,end_date,group_type,t
                                           max_hold_duration, cursor)
 
 if __name__ == '__main__':
-    conn, cursor = generate_db_link('192.168.0.105', '3306', 'stock_user', 'Ws143029', "stock_database")
-    do_statistic_by_arguments_adjust('600019','2013-01-01','2016-01-01','H',0.05,1.0,0.01, \
-                                     {"day": (1, 90, 1), "trade": (1, 60, 1)},cursor)
+    conn, cursor = generate_db_link('192.168.0.103', '3306', 'stock_user', 'Ws143029', "stock_database")
+    do_statistic_by_arguments_adjust('600019','2013-01-01','2016-01-01','H',0.05,0.5,0.005, \
+                                     {"day": (1, 90, 3), "trade": (1, 60, 2)},cursor)
 
     close_db_link(conn, cursor)
     """
